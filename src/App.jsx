@@ -140,6 +140,8 @@ function App() {
                     <div className="payment-button-wrapper">
                       <h4>Google Pay</h4>
                       <div id="google-pay-button-container"></div>
+                      {/* Test button to see if basic Google Pay works */}
+                      <div id="google-pay-test-container" style={{ marginTop: "10px" }}></div>
                     </div>
                   ) : (
                     <div className="payment-button-wrapper">
@@ -176,11 +178,17 @@ function App() {
             fundingSource="paypal"
           />
           {googlePayAvailable && (
-            <GooglePayButton
-              amount="24.97"
-              onApprove={handleGooglePayPayment}
-              googlePayConfig={googlePayConfig}
-            />
+            <>
+              <GooglePayButton
+                amount="24.97"
+                onApprove={handleGooglePayPayment}
+                googlePayConfig={googlePayConfig}
+              />
+              <TestGooglePayButton
+                amount="24.97"
+                onApprove={handleGooglePayPayment}
+              />
+            </>
           )}
           <AlternativePaymentButton
             amount="24.97"
@@ -238,67 +246,137 @@ function GooglePayButton({ amount, onApprove, googlePayConfig }) {
     if (window.paypal && googlePayConfig) {
       console.log("Rendering Google Pay button with config:", googlePayConfig);
 
-      const button = window.paypal.Buttons({
-        fundingSource: window.paypal.FUNDING.GOOGLEPAY,
-        createOrder: (data, actions) => {
-          console.log("Creating Google Pay order");
-          return actions.order.create({
-            purchase_units: [
-              {
-                amount: {
-                  value: amount,
+      try {
+        // First, try a simple Google Pay button without complex configuration
+        console.log("Attempting to create Google Pay button...");
+        
+        const button = window.paypal.Buttons({
+          fundingSource: window.paypal.FUNDING.GOOGLEPAY,
+          createOrder: (data, actions) => {
+            console.log("Creating Google Pay order");
+            return actions.order.create({
+              purchase_units: [
+                {
+                  amount: {
+                    value: amount,
+                  },
+                  description: "Premium Product Purchase",
                 },
-                description: "Premium Product Purchase",
-              },
-            ],
-          });
-        },
-        onApprove: (data, actions) => {
-          console.log("Google Pay order approved:", data);
-          return actions.order.capture().then((details) => {
-            console.log("Google Pay payment captured:", details);
-            onApprove(details.id);
-          });
-        },
-        onError: (err) => {
-          console.error("Google Pay error:", err);
-          alert("Google Pay payment failed. Please try again.");
-        },
-        // Google Pay specific configuration
-        googlePay: {
-          environment: "TEST", // or "PRODUCTION" for live
-          buttonColor: "black", // or "white"
-          buttonType: "plain", // or "buy", "checkout", "order", "subscribe"
-          allowedPaymentMethods: googlePayConfig.allowedPaymentMethods,
-          merchantInfo: googlePayConfig.merchantInfo,
-          transactionInfo: {
-            totalPriceStatus: "FINAL",
-            totalPrice: amount,
-            currencyCode: "USD",
-            countryCode: "US",
+              ],
+            });
           },
-        },
-      });
+          onApprove: (data, actions) => {
+            console.log("Google Pay order approved:", data);
+            return actions.order.capture().then((details) => {
+              console.log("Google Pay payment captured:", details);
+              onApprove(details.id);
+            });
+          },
+          onError: (err) => {
+            console.error("Google Pay error:", err);
+            alert("Google Pay payment failed. Please try again.");
+          },
+          onCancel: (data) => {
+            console.log("Google Pay payment cancelled:", data);
+          },
+          onInit: (data, actions) => {
+            console.log("Google Pay button initialized:", data);
+          },
+        });
 
-      // Check if the button is eligible before rendering
-      if (button.isEligible()) {
-        console.log("Google Pay button is eligible - rendering");
-        button.render("#google-pay-button-container");
-      } else {
-        console.log("Google Pay button is not eligible on this device/browser");
-        // Update the parent component to show the unavailable message
-        const container = document.getElementById(
-          "google-pay-button-container"
-        );
+        // Check if the button is eligible before rendering
+        console.log("Checking button eligibility...");
+        const isEligible = button.isEligible();
+        console.log("Button eligibility result:", isEligible);
+        
+        if (isEligible) {
+          console.log("Google Pay button is eligible - rendering");
+          button.render("#google-pay-button-container").then(() => {
+            console.log("Google Pay button rendered successfully");
+          }).catch((error) => {
+            console.error("Failed to render Google Pay button:", error);
+            const container = document.getElementById("google-pay-button-container");
+            if (container) {
+              container.innerHTML = '<p style="color: #666; font-size: 14px;">Google Pay button failed to render</p>';
+            }
+          });
+        } else {
+          console.log("Google Pay button is not eligible on this device/browser");
+          // Try rendering anyway to see what happens
+          console.log("Attempting to render Google Pay button anyway...");
+          button.render("#google-pay-button-container").then(() => {
+            console.log("Google Pay button rendered despite not being eligible");
+          }).catch((error) => {
+            console.error("Failed to render Google Pay button (not eligible):", error);
+            const container = document.getElementById("google-pay-button-container");
+            if (container) {
+              container.innerHTML = '<p style="color: #666; font-size: 14px;">Google Pay not available on this device/browser</p>';
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Error creating Google Pay button:", error);
+        const container = document.getElementById("google-pay-button-container");
         if (container) {
-          container.innerHTML =
-            '<p style="color: #666; font-size: 14px;">Google Pay not available on this device/browser</p>';
+          container.innerHTML = '<p style="color: #666; font-size: 14px;">Error creating Google Pay button</p>';
         }
       }
     } else {
       console.log("Cannot render Google Pay button - missing dependencies");
     }
   }, [amount, onApprove, googlePayConfig]);
+
+  return null;
+}
+
+// Test Google Pay Button Component (Simplified)
+function TestGooglePayButton({ amount, onApprove }) {
+  useEffect(() => {
+    console.log("TestGooglePayButton useEffect triggered");
+    
+    if (window.paypal) {
+      console.log("Creating test Google Pay button...");
+      
+      try {
+        const testButton = window.paypal.Buttons({
+          fundingSource: window.paypal.FUNDING.GOOGLEPAY,
+          createOrder: (data, actions) => {
+            console.log("Creating test Google Pay order");
+            return actions.order.create({
+              purchase_units: [
+                {
+                  amount: {
+                    value: amount,
+                  },
+                  description: "Test Purchase",
+                },
+              ],
+            });
+          },
+          onApprove: (data, actions) => {
+            console.log("Test Google Pay order approved:", data);
+            return actions.order.capture().then((details) => {
+              console.log("Test Google Pay payment captured:", details);
+              onApprove(details.id);
+            });
+          },
+          onError: (err) => {
+            console.error("Test Google Pay error:", err);
+          },
+        });
+
+        console.log("Test button eligibility:", testButton.isEligible());
+        
+        testButton.render("#google-pay-test-container").then(() => {
+          console.log("Test Google Pay button rendered successfully");
+        }).catch((error) => {
+          console.error("Failed to render test Google Pay button:", error);
+        });
+      } catch (error) {
+        console.error("Error creating test Google Pay button:", error);
+      }
+    }
+  }, [amount, onApprove]);
 
   return null;
 }
