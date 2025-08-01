@@ -10,7 +10,7 @@ function App() {
     // Load PayPal SDK with explicit components
     loadScript({
       "client-id":
-        "AWgLEpzQOEB41gdS-7p02bTq-en-0tfyXB8OL3sHaWP_4SiAT7jMY9SgMHA7dviyt_YE-LG_lThts350",
+        "AcEwGrBDYSuXPB9UjZ46gyQ92p-BP4Xqq6Udd7q6SIERBQ4zuDm-dKHVNn5U41akgmpWMs99nb5v80-c",
       currency: "USD",
       intent: "capture",
       components: "buttons,googlepay",
