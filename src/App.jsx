@@ -5,6 +5,7 @@ import "./App.css";
 function App() {
   const [paypalLoaded, setPaypalLoaded] = useState(false);
   const [googlePayAvailable, setGooglePayAvailable] = useState(false);
+  const [googlePayConfig, setGooglePayConfig] = useState(null);
 
   useEffect(() => {
     // Load PayPal SDK with explicit components
@@ -26,13 +27,60 @@ function App() {
   }, []);
 
   const checkGooglePayAvailability = async () => {
-    if (window.paypal && window.paypal.Googlepay) {
+    if (window.paypal) {
       try {
-        const googlePayConfig = await window.paypal.Googlepay().config();
-        if (googlePayConfig.allowedPaymentMethods.length > 0) {
+        // Check if Google Pay button is available
+        const isGooglePayAvailable = window.paypal.isEligible({
+          fundingSource: window.paypal.FUNDING.GOOGLEPAY,
+        });
+
+        console.log(
+          "Google Pay eligibility check result:",
+          isGooglePayAvailable
+        );
+
+        if (isGooglePayAvailable) {
+          console.log("Google Pay is available - setting up configuration");
           setGooglePayAvailable(true);
+          // Store the Google Pay configuration for use in the button
+          setGooglePayConfig({
+            isEligible: true,
+            apiVersion: 2,
+            apiVersionMinor: 0,
+            countryCode: "US",
+            allowedPaymentMethods: [
+              {
+                type: "CARD",
+                parameters: {
+                  allowedAuthMethods: ["PAN_ONLY", "CRYPTOGRAM_3DS"],
+                  allowedCardNetworks: [
+                    "MASTERCARD",
+                    "DISCOVER",
+                    "VISA",
+                    "AMEX",
+                  ],
+                  billingAddressRequired: true,
+                  assuranceDetailsRequired: true,
+                  billingAddressParameters: {
+                    format: "FULL",
+                  },
+                },
+                tokenizationSpecification: {
+                  type: "PAYMENT_GATEWAY",
+                  parameters: {
+                    gateway: "paypalsb",
+                    gatewayMerchantId: "8KBL748K82JQA",
+                  },
+                },
+              },
+            ],
+            merchantInfo: {
+              merchantOrigin: "paypledemo.netlify.app",
+              merchantId: "BCR2DN4TXSDMVTKM",
+            },
+          });
         } else {
-          console.log("Google Pay not available: No allowed payment methods");
+          console.log("Google Pay not available on this device/browser");
           setGooglePayAvailable(false);
         }
       } catch (error) {
@@ -40,7 +88,7 @@ function App() {
         setGooglePayAvailable(false);
       }
     } else {
-      console.log("PayPal Google Pay SDK not loaded");
+      console.log("PayPal SDK not loaded");
       setGooglePayAvailable(false);
     }
   };
@@ -101,10 +149,17 @@ function App() {
                   </div>
 
                   {/* Google Pay Button - Only show if available */}
-                  {googlePayAvailable && (
+                  {googlePayAvailable ? (
                     <div className="payment-button-wrapper">
                       <h4>Google Pay</h4>
                       <div id="google-pay-button-container"></div>
+                    </div>
+                  ) : (
+                    <div className="payment-button-wrapper">
+                      <h4>Google Pay</h4>
+                      <p style={{ color: "#666", fontSize: "14px" }}>
+                        Google Pay not available on this device/browser
+                      </p>
                     </div>
                   )}
 
@@ -137,6 +192,7 @@ function App() {
             <GooglePayButton
               amount="24.97"
               onApprove={handleGooglePayPayment}
+              googlePayConfig={googlePayConfig}
             />
           )}
           <AlternativePaymentButton
@@ -186,13 +242,20 @@ function PayPalButton({ amount, onApprove, fundingSource }) {
 }
 
 // Google Pay Button Component
-function GooglePayButton({ amount, onApprove }) {
+function GooglePayButton({ amount, onApprove, googlePayConfig }) {
   useEffect(() => {
-    if (window.paypal && window.paypal.Googlepay) {
+    console.log("GooglePayButton useEffect triggered");
+    console.log("window.paypal available:", !!window.paypal);
+    console.log("googlePayConfig available:", !!googlePayConfig);
+
+    if (window.paypal && googlePayConfig) {
+      console.log("Rendering Google Pay button with config:", googlePayConfig);
+
       window.paypal
         .Buttons({
           fundingSource: window.paypal.FUNDING.GOOGLEPAY,
           createOrder: (data, actions) => {
+            console.log("Creating Google Pay order");
             return actions.order.create({
               purchase_units: [
                 {
@@ -205,7 +268,9 @@ function GooglePayButton({ amount, onApprove }) {
             });
           },
           onApprove: (data, actions) => {
+            console.log("Google Pay order approved:", data);
             return actions.order.capture().then((details) => {
+              console.log("Google Pay payment captured:", details);
               onApprove(details.id);
             });
           },
@@ -213,10 +278,26 @@ function GooglePayButton({ amount, onApprove }) {
             console.error("Google Pay error:", err);
             alert("Google Pay payment failed. Please try again.");
           },
+          // Google Pay specific configuration
+          googlePay: {
+            environment: "TEST", // or "PRODUCTION" for live
+            buttonColor: "black", // or "white"
+            buttonType: "plain", // or "buy", "checkout", "order", "subscribe"
+            allowedPaymentMethods: googlePayConfig.allowedPaymentMethods,
+            merchantInfo: googlePayConfig.merchantInfo,
+            transactionInfo: {
+              totalPriceStatus: "FINAL",
+              totalPrice: amount,
+              currencyCode: "USD",
+              countryCode: "US",
+            },
+          },
         })
         .render("#google-pay-button-container");
+    } else {
+      console.log("Cannot render Google Pay button - missing dependencies");
     }
-  }, [amount, onApprove]);
+  }, [amount, onApprove, googlePayConfig]);
 
   return null;
 }
