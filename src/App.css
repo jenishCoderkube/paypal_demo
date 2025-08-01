@@ -391,3 +391,15 @@ body {
   text-align: center;
   font-weight: 500;
 }
+
+.payment-button-wrapper {
+  display: block;
+  margin: 10px 0;
+}
+
+#google-pay-button-container,
+#google-pay-test-container {
+  min-height: 50px;
+  display: block !important;
+  visibility: visible !important;
+}
